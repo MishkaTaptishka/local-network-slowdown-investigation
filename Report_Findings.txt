@@ -1,0 +1,40 @@
+MITRE ATT&CK Mapping
+
+Tactic: Discovery
+Technique: [T1046] Network Service Scanning
+- Devices were observed making over 100 connection attempts to a wide range of internal and external IPs.
+- The pattern of activity strongly suggested port enumeration across the 10.0.0.0/16 subnet.
+
+Tactic: Execution
+Technique: [T1059] Command and Scripting Interpreter
+- PowerShell (powershell.exe) was used to execute portscan.ps1.
+- Command-line scripts were run via cmd.exe.
+- All activity was initiated by the SYSTEM account without interactive user involvement.
+
+Tactic: Privilege Escalation / Abuse
+Technique: [T1078] Valid Accounts
+- Scripts ran with SYSTEM-level privileges, indicating the use of scheduled tasks or service abuse.
+
+Tactic: Defense Evasion
+Technique: [T1036] Masquerading
+- The PowerShell and CMD-based scripts were named and located to blend in with legitimate system files (e.g., placed in ProgramData).
+
+Findings
+- felix-win10 was one of several devices exhibiting scanning behavior.
+- The suspicious behavior was tied to the execution of portscan.ps1 and additional CMD scripts.
+- No interactive users were associated with the activity; all executions occurred under SYSTEM.
+- Similar scanning was observed on other endpoints during the same period.
+
+Recommendations
+- Isolate Affected Systems Immediately
+- Perform Full Malware Scans
+- Restore from a Known Good Backup
+- Audit Scheduled Tasks and Startup Items
+- Apply Application Controls
+- Set Port Scan Alerts
+
+Supporting Evidence
+- TotalDeviceNetworkEvents.csv
+- TotalConnectionsPerDeviceNetworkEvents.csv
+- felix-win10-investigation.csv
+- felix-win10.csv

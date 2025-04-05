@@ -1,0 +1,56 @@
+// check DeviceNetworkEvents for any network activity within the last 7 days
+DeviceNetworkEvents
+| where TimeGenerated > ago(7d)
+
+// filter for failed connection attempts within the 10.0.0.0/16 local network range
+// exclude loopback and IPv6 localhost addresses (::1, 127.0.0.1)
+// display key fields for review and count total failed connections per device
+DeviceNetworkEvents
+| where TimeGenerated > ago(7d)
+| where ActionType == "ConnectionFailed"
+| where LocalIP has "10.0."
+| where LocalIP !has "::1"
+| where LocalIP !has "127."
+| project TimeGenerated, DeviceName, ActionType, LocalIP, RemoteIP
+| summarize connection_count = count() by DeviceName, ActionType, LocalIP
+| order by connection_count desc 
+
+// investigate specific host (felix-win10) suspected of excessive connection failures
+// focus on local IP 10.0.0.121 to isolate unique behavior
+// summarize and display failed connection attempts with port details and initiating process
+DeviceNetworkEvents
+| where TimeGenerated > ago(7d)
+| where LocalIP has "10.0."
+| where LocalIP !has "::1"
+| where LocalIP !has "127."
+| where DeviceName == "felix-win10"
+| where LocalIP == "10.0.0.121"
+| where ActionType == "ConnectionFailed"
+| summarize failed_connections = count() by TimeGenerated, DeviceName, ActionType, LocalIP, LocalPort, RemoteIP, RemotePort, InitiatingProcessFileName
+| order by failed_connections
+
+// correlate DeviceNetworkEvents with DeviceProcessEvents to identify the command-line activity responsible
+// collect recent failed connection attempts on felix-win10 originating from local IP 10.0.0.121
+let network_events =
+    DeviceNetworkEvents
+    | where TimeGenerated > ago(7d)
+    | where LocalIP has "10.0."
+    | where LocalIP !has "::1"
+    | where LocalIP !has "127."
+    | where DeviceName == "felix-win10"
+    | where LocalIP == "10.0.0.121"
+    | where ActionType == "ConnectionFailed"
+    | project network_time = TimeGenerated, DeviceName, ActionType, LocalIP, LocalPort, RemoteIP, RemotePort, InitiatingProcessFileName;
+// collect process events for command line usage
+let process_events =
+    DeviceProcessEvents
+    | where TimeGenerated > ago(7d)
+    | where DeviceName == "felix-win10"
+    | where FileName in~ ("cmd.exe", "powershell.exe")
+    | project process_time = TimeGenerated, DeviceName, FileName, ProcessCommandLine, AccountName; 
+// join the tables on DeviceName and match timestamps
+network_events
+| join kind=inner process_events on DeviceName
+| where abs(datetime_diff("minute", network_time, process_time)) <= 1
+| project network_time, process_time, DeviceName, ActionType, LocalIP, RemoteIP, FileName, AccountName, InitiatingProcessFileName, ProcessCommandLine 
+| order by network_time desc
